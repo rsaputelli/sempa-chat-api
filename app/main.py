@@ -2,6 +2,8 @@
 from typing import List
 
 from fastapi import FastAPI, HTTPException, Request, Depends
+from fastapi.responses import HTMLResponse
+from fastapi import Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -209,3 +211,98 @@ async def debug_tenant(client_id: str):
         "num_texts": len(rag.texts),
         "dim": rag.dim,
     }
+
+
+# --- Embedded widget endpoint ---
+WIDGET_HTML = """<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SEMPA Chat</title>
+  <style>
+    :root { --pad:16px; --radius:12px; --muted:#f6f6f6; --border:#e5e5e5; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: var(--pad); color:#111; }
+    h3 { margin: 0 0 8px 0; font-size: 20px; }
+    .card { border:1px solid var(--border); border-radius: var(--radius); padding: var(--pad); background:#fff; }
+    textarea { width: 100%; resize: vertical; min-height: 90px; font: inherit; padding: 10px; border-radius: 10px; border:1px solid var(--border); box-sizing: border-box; }
+    button { margin-top: 10px; padding: 10px 14px; border-radius: 10px; border:1px solid var(--border); background:#111; color:#fff; cursor:pointer; }
+    button[disabled] { opacity:.6; cursor: not-allowed; }
+    .hint { color:#666; font-size: 12px; margin-top:6px; }
+    pre { white-space: pre-wrap; word-wrap: break-word; background: var(--muted); padding: 12px; border-radius: 10px; border:1px solid var(--border); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h3>Ask SEMPA</h3>
+    <textarea id="q" placeholder="Type your question... (Ctrl+Enter to send)"></textarea>
+    <button id="ask">Ask</button>
+    <div class="hint" id="hint">Answers are based on SEMPA documents. If we can't find it, we'll suggest contacting SEMPA.</div>
+  </div>
+  <div style="height:12px"></div>
+  <div class="card">
+    <pre id="out">Ask a question to get started.</pre>
+  </div>
+
+  <script>
+    (function () {
+      const qEl = document.getElementById('q');
+      const btn = document.getElementById('ask');
+      const out = document.getElementById('out');
+
+      const params = new URLSearchParams(location.search);
+      const clientId = params.get('client_id') || 'sempa'; // override with ?client_id=
+
+      function postHeight() {
+        try {
+          const h = document.documentElement.scrollHeight;
+          window.parent && window.parent.postMessage({ type: 'sempaWidgetSize', height: h }, '*');
+        } catch(e) {}
+      }
+      const ro = new ResizeObserver(postHeight);
+      ro.observe(document.body);
+
+      async function ask() {
+        const question = qEl.value.trim();
+        if (!question) return;
+        btn.disabled = true;
+        out.textContent = 'Thinking...';
+        try {
+          const r = await fetch('/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question, client_id: clientId })
+          });
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          const data = await r.json();
+          out.textContent = data.answer || '(no answer)';
+        } catch (e) {
+          out.textContent = 'Sorry—there was a problem reaching the chat service.';
+          console.error(e);
+        } finally {
+          btn.disabled = false;
+          postHeight();
+        }
+      }
+
+      btn.addEventListener('click', ask);
+      qEl.addEventListener('keydown', (ev) => {
+        if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter') ask();
+      });
+
+      postHeight();
+    })();
+  </script>
+</body>
+</html>"""
+
+@app.get("/widget", response_class=HTMLResponse)
+def widget(client_id: str = Query(default="sempa", description="Tenant id")):
+    return HTMLResponse(
+        content=WIDGET_HTML,
+        headers={
+            "Content-Security-Policy": "frame-ancestors 'self' https://www.sempa.org https://sempa.org;",
+            "Referrer-Policy": "strict-origin-when-cross-origin",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
