@@ -39,3 +39,5 @@ node_modules/
 
 # keep SEMPA embeddings tracked
 !clients/sempa/embeddings_v2/**
+
+!clients/sempa/embeddings_v2/**
