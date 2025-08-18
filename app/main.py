@@ -1,4 +1,4 @@
-import os
+ï»¿import os
 from typing import List
 
 from fastapi import FastAPI, HTTPException, Request, Depends
@@ -12,7 +12,7 @@ load_dotenv()
 from .tenants import ALLOWED_TENANTS, TENANT_CONFIG
 from .rag import SimpleRAG
 
-VERSION = "2025-08-18f"  # visible in /debug/env
+VERSION = "2025-08-18g"  # visible in /debug/env
 
 # -------------------
 # FastAPI app
@@ -136,7 +136,7 @@ def load_prompt_for(client_id: str) -> str:
     return (
         "You are a helpful assistant for SEMPA (Society of Emergency Medicine Physician Assistants).\n"
         "Answer clearly and concisely based ONLY on the provided context. If the answer is not in the context,\n"
-        "say you’re not sure and suggest contacting SEMPA (https://www.sempa.org/contact/)."
+        "say you are not sure and suggest contacting SEMPA (https://www.sempa.org/contact/)."
     )
 
 # -------------------
@@ -155,8 +155,8 @@ async def chat(req: ChatRequest, request: Request, _=Depends(verify_origin)):
     if client is not None:
         system_prompt = load_prompt_for(req.client_id)
         user_msg = (
-            "You are SEMPA’s assistant. Use the provided CONTEXT when it's relevant. "
-            "If the answer isn’t clearly supported by the context or you’re unsure, say so briefly "
+            "You are SEMPA's assistant. Use the provided CONTEXT when it is relevant. "
+            "If the answer is not clearly supported by the context or you are unsure, say so briefly "
             "and recommend contacting SEMPA (https://www.sempa.org/contact/). "
             "Prefer SEMPA policies and site info over general knowledge.\n\n"
             f"QUESTION:\n{req.question}\n\n"
@@ -164,7 +164,7 @@ async def chat(req: ChatRequest, request: Request, _=Depends(verify_origin)):
         if ctx_block:
             user_msg += (
                 f"CONTEXT:\n{ctx_block}\n\n"
-                "(If you used the context, keep the answer concise and cite the specific pages/topics.)"
+                "(If you used the context, keep the answer concise and cite the specific pages or topics.)"
             )
         else:
             user_msg += "No context was retrieved."
@@ -191,12 +191,12 @@ async def chat(req: ChatRequest, request: Request, _=Depends(verify_origin)):
     # Fallback
     if contexts:
         best = contexts[0]
-        answer = "Here’s what I found in SEMPA materials:\n\n" + (best[:900] + ("..." if len(best) > 900 else ""))
+        answer = "Here is what I found in SEMPA materials:\n\n" + (best[:900] + ("..." if len(best) > 900 else ""))
         sources = [c[:160] for c in contexts]
         return ChatResponse(answer=answer, sources=sources)
 
     return ChatResponse(
-        answer="I’m not sure from SEMPA documents. Please contact SEMPA at https://www.sempa.org/contact/ for assistance.",
+        answer="I am not sure from SEMPA documents. Please contact SEMPA at https://www.sempa.org/contact/ for assistance.",
         sources=[],
     )
 
