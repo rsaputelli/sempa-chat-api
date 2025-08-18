@@ -1,13 +1,16 @@
 services:
   - type: web
-    name: sempa-multitenant-backend
+    name: sempa-chat-api
     env: python
-    plan: starter
+    plan: free
+    # Pick a region you like; omit if you don't care
+    region: ohio
+    pythonVersion: 3.11.9
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
-      - key: PYTHONUNBUFFERED
-        value: "1"
-      - key: ALLOW_NO_ORIGIN
-        value: "false"
-    autoDeploy: true
+      # keep secrets in the dashboard; 'sync: false' means "don't store in git"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o
