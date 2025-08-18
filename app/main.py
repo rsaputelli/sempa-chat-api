@@ -409,3 +409,8 @@ def embed_js(client_id: str = "sempa"):
 
 
 
+
+@app.head("/")
+async def root_head():
+    return Response(status_code=200)
+
