@@ -34,4 +34,5 @@ node_modules/
 *.sqlite
 *.db
 *.log
-!*.env.example
+'!*.env.example' | Add-Content .gitignore
+
