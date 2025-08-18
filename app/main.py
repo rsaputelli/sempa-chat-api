@@ -640,3 +640,4 @@ try:
 except NameError:
     import os as _os2
     DEBUG_CHAT = _os2.getenv("DEBUG_CHAT", "").lower() in ("1","true","yes")
+
