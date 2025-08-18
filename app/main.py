@@ -61,10 +61,9 @@ async def root():
         "endpoints": ["/healthz", "/debug/env", "/chat", "/debug/tenant/{client_id}"],
     }
 
-@app.get("/healthz")
+@app.api_route("/healthz", methods=["GET", "HEAD"], include_in_schema=False)
 async def healthz():
     return {"ok": True}
-
 @app.get("/debug/env")
 async def debug_env():
     return {
@@ -407,5 +406,6 @@ JS_EMBED = r"""(function(){
 @app.get("/embed.js")
 def embed_js(client_id: str = "sempa"):
     return Response(content=JS_EMBED, media_type="application/javascript")
+
 
 
