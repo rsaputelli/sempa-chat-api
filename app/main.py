@@ -172,17 +172,45 @@ def needs_clarification(q: str) -> bool:
 
 def build_sources(hits) -> List[Source]:
     out: List[Source] = []
-    for score, meta, _txt in (hits or [])[:3]:
-        url = (meta or {}).get("url") or (meta or {}).get("source")
-        title = (meta or {}).get("title") or (url or None)
-        if url:
-            try:
-                fscore = float(score) if score is not None else None
-            except Exception:
-                fscore = None
-            out.append(Source(title=title, url=url, score=fscore))
-    return out
+    for item in (hits or [])[:3]:
+        try:
+            # Unpack common shapes: (score, meta, text) or similar
+            score = None
+            meta = None
+            if isinstance(item, (list, tuple)) and len(item) >= 2:
+                score = item[0]
+                meta = item[1]
 
+            url = None
+            title = None
+
+            if isinstance(meta, dict):
+                url = meta.get("url") or meta.get("source")
+                title = meta.get("title") or (url or None)
+            elif isinstance(meta, str):
+                # treat string that looks like a URL as the source
+                if meta.startswith("http"):
+                    url = meta
+                    title = meta
+            elif isinstance(meta, (list, tuple)):
+                # try to find a url-like string inside
+                for m in meta:
+                    if isinstance(m, str) and m.startswith("http"):
+                        url = m
+                        title = m
+                        break
+            # Ignore ints/None/unknown types silently
+
+            if url:
+                try:
+                    fscore = float(score) if score is not None else None
+                except Exception:
+                    fscore = None
+                out.append(Source(title=title or "Source", url=url, score=fscore))
+        except Exception:
+            # never let sources building crash the handler
+            continue
+    return out
 # -------------------
 # Helpers
 # -------------------
@@ -566,3 +594,4 @@ EMBED_JS = """
 def embed_js(client_id: str = Query(default="sempa", description="Default tenant id")):
     # Note: client_id from query is not required here because we allow script data attributes.
     return Response(content=EMBED_JS, media_type="application/javascript")
+
