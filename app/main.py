@@ -138,14 +138,14 @@ def load_prompt_for(client_id: str) -> str:
         with open(prompt_path, "r", encoding="utf-8") as f:
             return f.read().strip()
     return (
-        "You are a helpful assistant for SEMPA (Society of Emergency Medicine Physician Assistants).\n"
-        "Answer clearly and concisely based ONLY on the provided context. If the answer is not in the context,\n"
-        "say you are not sure and suggest contacting SEMPA (https://www.sempa.org/contact/)."
+        "You are SEMPA's assistant. Use the provided CONTEXT when it strengthens your answer.\n"
+        "If the question is general (for example, definitions or common healthcare concepts) or the CONTEXT is empty,\n"
+        "answer briefly and accurately using well-accepted general knowledge. Do not invent SEMPA-specific policies,\n"
+        "benefits, prices, dates, or legal guidance—if those are asked and not clearly in the CONTEXT, say you are not\n"
+        "sure and direct users to SEMPA's official pages or contact form (https://www.sempa.org/contact/).\n"
+        "Prefer concise, plain-language answers; when appropriate, add one line that relates the answer to the SEMPA audience."
     )
 
-# -------------------
-# Main routes
-# -------------------
 @app.post("/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest, request: Request, _=Depends(verify_origin)):
     # Retrieve RAG results
@@ -405,3 +405,4 @@ JS_EMBED = r"""(function(){
 @app.get("/embed.js")
 def embed_js(client_id: str = "sempa"):
     return Response(content=JS_EMBED, media_type="application/javascript")
+
