@@ -12,6 +12,23 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# --- Debug flags and URL helpers (patch) ---
+DEBUG_SOURCES = os.getenv("DEBUG_SOURCES", "").lower() in ("1","true","yes")
+DEBUG_CHAT     = os.getenv("DEBUG_CHAT", "").lower() in ("1","true","yes")
+
+URL_RE = re.compile(r"https?://[^\s)>\]]+")
+def first_url_from_text(s: Optional[str]) -> Optional[str]:
+    if not s:
+        return None
+    m = URL_RE.search(s)
+    return m.group(0) if m else None
+
+def title_from_url(u: str) -> str:
+    try:
+        from urllib.parse import urlparse
+        return urlparse(u).netloc or "Source"
+    except Exception:
+        return "Source"
 from .tenants import ALLOWED_TENANTS, TENANT_CONFIG
 from .rag import SimpleRAG
 
@@ -606,6 +623,7 @@ EMBED_JS = """
 def embed_js(client_id: str = Query(default="sempa", description="Default tenant id")):
     # Note: client_id from query is not required here because we allow script data attributes.
     return Response(content=EMBED_JS, media_type="application/javascript")
+
 
 
 
