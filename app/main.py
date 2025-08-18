@@ -2,6 +2,8 @@
 from typing import List
 
 from fastapi import FastAPI, HTTPException, Request, Depends
+from fastapi.responses import HTMLResponse, Response
+from fastapi import Query
 from fastapi.responses import HTMLResponse
 from fastapi import Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -306,3 +308,100 @@ def widget(client_id: str = Query(default="sempa", description="Tenant id")):
             "X-Content-Type-Options": "nosniff",
         },
     )
+
+
+# --- Embeddable floating chat bubble (served at /embed.js) ---
+JS_EMBED = r"""(function(){
+  var thisScript = document.currentScript || (function(){var s=document.getElementsByTagName('script');return s[s.length-1];})();
+  var base = new URL(thisScript.src).origin;
+  var ds = thisScript.dataset || {};
+  var clientId = ds.clientId || 'sempa';
+  var color = ds.color || '#003366';   // SEMPA navy from sempa.org
+  var side = (ds.position || 'right').toLowerCase(); // 'right' or 'left'
+  var title = ds.title || 'SEMPA Chat';
+
+  // Launcher button (speech bubble icon)
+  var btn = document.createElement('button');
+  btn.setAttribute('aria-label','Open ' + title);
+  btn.style.cssText = [
+    'position:fixed',
+    'bottom:24px',
+    (side==='left'?'left:24px':'right:24px'),
+    'width:56px','height:56px',
+    'border-radius:999px',
+    'border:none',
+    'box-shadow:0 8px 20px rgba(0,0,0,.15)',
+    'background:'+color,
+    'color:#fff',
+    'cursor:pointer',
+    'z-index:2147483647',
+    'display:flex','align-items:center','justify-content:center'
+  ].join(';');
+  btn.innerHTML = '<svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true"><path d="M20 2H4a2 2 0 0 0-2 2v14l4-3h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"/></svg>';
+
+  // Panel container
+  var panel = document.createElement('div');
+  panel.style.cssText = [
+    'position:fixed',
+    'bottom:96px',
+    (side==='left'?'left:24px':'right:24px'),
+    'width:380px','max-width:95vw',
+    'height:560px','max-height:85vh',
+    'background:#fff',
+    'border:1px solid #e5e5e5',
+    'border-radius:12px',
+    'box-shadow:0 12px 30px rgba(0,0,0,.18)',
+    'overflow:hidden',
+    'display:none',
+    'z-index:2147483000'
+  ].join(';');
+
+  // Header
+  var header = document.createElement('div');
+  header.style.cssText = 'height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;border-bottom:1px solid #eee;background:'+color+';color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:14px';
+  var titleEl = document.createElement('div');
+  titleEl.textContent = title;
+  var close = document.createElement('button');
+  close.textContent = '✕';
+  close.setAttribute('aria-label','Close');
+  close.style.cssText = 'border:none;background:transparent;font-size:18px;cursor:pointer;color:#fff';
+  header.appendChild(titleEl); header.appendChild(close);
+
+  // Iframe (loads your /widget)
+  var iframe = document.createElement('iframe');
+  iframe.src = base + '/widget?client_id=' + encodeURIComponent(clientId);
+  iframe.style.cssText = 'width:100%;height:calc(100% - 44px);border:0;display:block;background:#fff';
+  iframe.setAttribute('allow','clipboard-write *');
+  iframe.setAttribute('title', title);
+
+  panel.appendChild(header);
+  panel.appendChild(iframe);
+
+  // Toggle logic
+  function toggle(open){
+    var isOpen = panel.style.display !== 'none';
+    var willOpen = (open===undefined) ? !isOpen : !!open;
+    panel.style.display = willOpen ? 'block' : 'none';
+    btn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+  }
+  btn.addEventListener('click', function(){ toggle(); });
+  close.addEventListener('click', function(){ toggle(false); });
+
+  // Resize panel based on widget messages
+  window.addEventListener('message', function(ev){
+    var d = ev.data || {};
+    if (d && d.type === 'sempaWidgetSize') {
+      var h = Math.max(420, Math.min(800, +d.height || 560));
+      panel.style.height = h + 'px';
+    }
+  });
+
+  document.addEventListener('DOMContentLoaded', function(){
+    document.body.appendChild(panel);
+    document.body.appendChild(btn);
+  });
+})();"""
+
+@app.get("/embed.js")
+def embed_js(client_id: str = "sempa"):
+    return Response(content=JS_EMBED, media_type="application/javascript")
