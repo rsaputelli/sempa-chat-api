@@ -608,3 +608,4 @@ def embed_js(client_id: str = Query(default="sempa", description="Default tenant
     return Response(content=EMBED_JS, media_type="application/javascript")
 
 
+
