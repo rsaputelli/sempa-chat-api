@@ -223,18 +223,20 @@ WIDGET_HTML = """<!doctype html>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>SEMPA Chat</title>
   <style>
-    :root { --pad:16px; --radius:12px; --muted:#f6f6f6; --border:#e5e5e5; }
+    :root { --pad:16px; --radius:12px; --muted:#f6f6f6; --border:#e5e5e5; --brand:#003366; }
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: var(--pad); color:#111; }
-    h3 { margin: 0 0 8px 0; font-size: 20px; }
+    .brand { background:var(--brand); color:#fff; border-radius:12px; padding:10px 14px; margin:0 0 12px 0; font-weight:600; }
+    h3 { margin: 0 0 8px 0; font-size: 20px; color: var(--brand); }
     .card { border:1px solid var(--border); border-radius: var(--radius); padding: var(--pad); background:#fff; }
     textarea { width: 100%; resize: vertical; min-height: 90px; font: inherit; padding: 10px; border-radius: 10px; border:1px solid var(--border); box-sizing: border-box; }
-    button { margin-top: 10px; padding: 10px 14px; border-radius: 10px; border:1px solid var(--border); background:#111; color:#fff; cursor:pointer; }
+    button { margin-top: 10px; padding: 10px 14px; border-radius: 10px; border:1px solid var(--border); background:var(--brand); color:#fff; cursor:pointer; }
     button[disabled] { opacity:.6; cursor: not-allowed; }
     .hint { color:#666; font-size: 12px; margin-top:6px; }
     pre { white-space: pre-wrap; word-wrap: break-word; background: var(--muted); padding: 12px; border-radius: 10px; border:1px solid var(--border); }
   </style>
 </head>
 <body>
+  <div class="brand">SEMPA Chat</div>
   <div class="card">
     <h3>Ask SEMPA</h3>
     <textarea id="q" placeholder="Type your question... (Ctrl+Enter to send)"></textarea>
@@ -253,7 +255,7 @@ WIDGET_HTML = """<!doctype html>
       const out = document.getElementById('out');
 
       const params = new URLSearchParams(location.search);
-      const clientId = params.get('client_id') || 'sempa'; // override with ?client_id=
+      const clientId = params.get('client_id') || 'sempa';
 
       function postHeight() {
         try {
@@ -405,4 +407,5 @@ JS_EMBED = r"""(function(){
 @app.get("/embed.js")
 def embed_js(client_id: str = "sempa"):
     return Response(content=JS_EMBED, media_type="application/javascript")
+
 
