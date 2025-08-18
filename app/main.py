@@ -174,32 +174,43 @@ def build_sources(hits) -> List[Source]:
     out: List[Source] = []
     for item in (hits or [])[:3]:
         try:
-            # Unpack common shapes: (score, meta, text) or similar
+            # Unpack common shapes: (score, meta, text)
             score = None
             meta = None
-            if isinstance(item, (list, tuple)) and len(item) >= 2:
-                score = item[0]
-                meta = item[1]
+            txt = None
+            if isinstance(item, (list, tuple)):
+                if len(item) >= 1: score = item[0]
+                if len(item) >= 2: meta = item[1]
+                if len(item) >= 3: txt = item[2]
+            else:
+                txt = str(item)
+
+            if DEBUG_SOURCES:
+                print("build_sources item:", type(item).__name__, "meta:", type(meta).__name__ if meta is not None else None)
 
             url = None
             title = None
 
+            # Prefer explicit metadata when it's a dict
             if isinstance(meta, dict):
                 url = meta.get("url") or meta.get("source")
                 title = meta.get("title") or (url or None)
-            elif isinstance(meta, str):
-                # treat string that looks like a URL as the source
-                if meta.startswith("http"):
-                    url = meta
-                    title = meta
+            elif isinstance(meta, str) and meta.startswith("http"):
+                url = meta
+                title = meta
             elif isinstance(meta, (list, tuple)):
-                # try to find a url-like string inside
+                # scan any string elements for a URL
                 for m in meta:
                     if isinstance(m, str) and m.startswith("http"):
                         url = m
                         title = m
                         break
-            # Ignore ints/None/unknown types silently
+
+            # If still no URL, try to pull one out of the text
+            if not url and isinstance(txt, str):
+                url = first_url_from_text(txt)
+                if url and not title:
+                    title = title_from_url(url)
 
             if url:
                 try:
@@ -207,8 +218,9 @@ def build_sources(hits) -> List[Source]:
                 except Exception:
                     fscore = None
                 out.append(Source(title=title or "Source", url=url, score=fscore))
-        except Exception:
-            # never let sources building crash the handler
+        except Exception as e:
+            if DEBUG_SOURCES:
+                print("build_sources error:", e)
             continue
     return out
 # -------------------
@@ -594,4 +606,5 @@ EMBED_JS = """
 def embed_js(client_id: str = Query(default="sempa", description="Default tenant id")):
     # Note: client_id from query is not required here because we allow script data attributes.
     return Response(content=EMBED_JS, media_type="application/javascript")
+
 
