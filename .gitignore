@@ -1,0 +1,36 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pytest_cache/
+*.mypy_cache/
+
+# Virtual envs
+.venv/
+venv/
+
+# Editors/OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Build
+build/
+dist/
+
+# Env & secrets
+.env
+.env.*
+*.secret*
+*.key
+*.pem
+
+# Node (if any frontend bits exist)
+node_modules/
+
+# Data you don’t want public
+*.sqlite
+*.db
+*.log
