@@ -36,3 +36,6 @@ node_modules/
 *.log
 '!*.env.example' | Add-Content .gitignore
 
+
+# keep SEMPA embeddings tracked
+!clients/sempa/embeddings_v2/**
