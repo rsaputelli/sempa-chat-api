@@ -30,7 +30,8 @@ dist/
 # Node (if any frontend bits exist)
 node_modules/
 
-# Data you don’t want public
+# Data you donâ€™t want public
 *.sqlite
 *.db
 *.log
+!*.env.example
