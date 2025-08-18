@@ -628,3 +628,15 @@ def embed_js(client_id: str = Query(default="sempa", description="Default tenant
 
 
 
+# --- appended by patch: guard debug flags to avoid NameError ---
+try:
+    DEBUG_SOURCES
+except NameError:
+    import os as _os1
+    DEBUG_SOURCES = _os1.getenv("DEBUG_SOURCES", "").lower() in ("1","true","yes")
+
+try:
+    DEBUG_CHAT
+except NameError:
+    import os as _os2
+    DEBUG_CHAT = _os2.getenv("DEBUG_CHAT", "").lower() in ("1","true","yes")
