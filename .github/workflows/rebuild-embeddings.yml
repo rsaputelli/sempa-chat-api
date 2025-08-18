@@ -1,42 +1,57 @@
-﻿name: Rebuild SEMPA embeddings
+# .github/workflows/ingest.yml
+name: Rebuild SEMPA embeddings
 
 on:
   workflow_dispatch: {}
   schedule:
-    - cron: "30 9 * * 1"   # Mondays 09:30 UTC (≈ 5:30am ET)
+    - cron: "0 9 * * 1"   # Mondays 09:00 UTC
 
 permissions:
   contents: write
 
 jobs:
-  rebuild:
+  ingest:
+    name: Crawl & Embed
     runs-on: ubuntu-latest
+    timeout-minutes: 90
+    # NO concurrency block here, so GitHub won't cancel us on self-push
+
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       EMBED_MODEL: text-embedding-3-small
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
+      - name: Install deps
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install beautifulsoup4 lxml faiss-cpu
+          # belts & suspenders in case requirements didn’t include these
+          pip install beautifulsoup4 httpx
 
-      - name: Rebuild curated embeddings
+      - name: Show URL list
         run: |
-          python scripts/ingest_sempa.py --out clients/sempa/embeddings_v2
+          echo "URLs file (scripts/urls.txt):"
+          test -f scripts/urls.txt && sed -n '1,120p' scripts/urls.txt || echo "MISSING scripts/urls.txt"
 
-      - name: Commit changes (if any)
+      - name: Ingest SEMPA
         run: |
-          git config user.name "sempa-bot"
-          git config user.email "actions@users.noreply.github.com"
-          git add clients/sempa/embeddings_v2
-          git diff --staged --quiet || git commit -m "Auto: rebuild embeddings_v2"
+          python scripts/ingest_sempa.py \
+            --urls-file scripts/urls.txt \
+            --out clients/sempa/embeddings_v2
 
-      - name: Push
-        run: git push
+      - name: Commit embeddings (skip CI)
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "CI: refresh SEMPA embeddings_v2 [skip ci]"
+          file_pattern: clients/sempa/embeddings_v2/*
+
