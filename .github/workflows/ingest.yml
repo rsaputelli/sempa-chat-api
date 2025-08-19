@@ -48,7 +48,7 @@ jobs:
           # emit a heartbeat every 20s so the runner never looks idle
           ( while true; do echo "::notice::heartbeat $(date -u +"%H:%M:%S")"; sleep 20; done ) &
           HB=$!
-          python scripts/ingest_sempa.py --urls-file scripts/urls.txt --out clients/sempa/embeddings_v2 --batch 64 --max-urls 200 --max-chunks 6000
+          python scripts/ingest_sempa.py --urls-file scripts/urls.txt --out clients/sempa/embeddings_v2 --batch 64 --max-urls 200 --max-chunks 6000 --batch 64 --max-urls 200 --max-chunks 6000
           kill $HB || true
           ls -la clients/sempa/embeddings_v2
 
@@ -64,4 +64,5 @@ jobs:
             git commit -m "chore(ingest): refresh embeddings_v2 [skip ci]"
             git push
           fi
+
 
