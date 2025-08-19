@@ -1,4 +1,4 @@
-name: Rebuild SEMPA embeddings
+﻿name: Rebuild SEMPA embeddings
 
 on:
   workflow_dispatch:
@@ -60,3 +60,5 @@ jobs:
         run: |
           set -euo pipefail
           trap 'echo "::error::received cancel signal (INT/TE
+
+
