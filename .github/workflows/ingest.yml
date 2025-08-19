@@ -1,9 +1,9 @@
-﻿name: Rebuild SEMPA embeddings
+name: Rebuild SEMPA embeddings
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 9 * * 1"  # Mondays 09:00 UTC (adjust as you like)
+    - cron: "0 9 * * 1"  # Mondays 09:00 UTC
 
 permissions:
   contents: write
@@ -59,32 +59,4 @@ jobs:
         timeout-minutes: 30
         run: |
           set -euo pipefail
-          trap 'echo "::error::received cancel signal (INT/TERM/HUP) – external cancellation"; exit 2' INT TERM HUP
-          ( while true; do echo "::notice::heartbeat $(date -u +%H:%M:%S)"; sleep 20; done ) & HB=$!
-
-          python -u scripts/ingest_sempa.py \
-            --urls-file scripts/urls.txt \
-            --out clients/sempa/embeddings_v2 \
-            --batch 64 \
-            --max-urls 200 \
-            --max-chunks 6000
-
-          kill $HB || true
-          ls -la clients/sempa/embeddings_v2 || true
-
-      - name: Commit & push embeddings
-        if: ${{ success() }}
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A clients/sempa/embeddings_v2
-          if git diff --cached --quiet; then
-            echo "No changes to commit."
-          else
-            git commit -m "chore(ingest): refresh embeddings_v2 [skip ci]"
-            git push origin HEAD:${{ github.ref_name }}
-          fi
-
-      - name: Was this run cancelled?
-        if: ${{ cancelled() }}
-        run: echo "GitHub marked this job as cancelled (most likely a concurrency or manual cancel)."
+          trap 'echo "::error::received cancel signal (INT/TE
