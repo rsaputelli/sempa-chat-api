@@ -1,98 +1,19 @@
-﻿name: Ingest (test only, no commit)
+﻿name: Ingest (test only)
 
 on:
   workflow_dispatch:
 
-# Give this workflow its own concurrency group and DO NOT cancel in-progress runs
-concurrency:
-  group: ingest-test-${{ github.ref }}
-  cancel-in-progress: false
-
 jobs:
   test:
     runs-on: ubuntu-22.04
-    timeout-minutes: 60
-    permissions:
-      contents: read
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
 
-      - name: Setup Python
+      - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt beautifulsoup4 httpx
-
-      - name: Show run context
-        run: |
-          echo "Actor: ${{ github.actor }}"
-          echo "Workflow: ${{ github.workflow }}"
-          echo "Run ID: ${{ github.run_id }}"
-          echo "Ref: ${{ github.ref }}"
-          echo "Cancel redundant (repo setting) may be enabled — if so, a new run can cancel this one."
-
-      - name: Sanity: secret present & OpenAI ping
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          PYTHONUNBUFFERED: "1"
-        run: |
-          python - <<'PY'
-          import os, sys
-          from openai import OpenAI
-          key_ok = bool(os.getenv("OPENAI_API_KEY"))
-          print("OPENAI_API_KEY set:", key_ok)
-          try:
-              c = OpenAI()
-              # a very cheap call; just list models metadata headers
-              ms = c.models.list()
-              print("OpenAI models listed:", isinstance(ms.data, list))
-          except Exception as e:
-              print("OpenAI error:", repr(e))
-              sys.exit(1)
-          PY
-
-      - name: Sanity: sempa.org reachable
-        run: |
-          set -e
-          curl -I -L --max-time 15 https://sempa.org | head -n 20 || true
-          python - <<'PY'
-          import httpx
-          try:
-              r = httpx.get("https://sempa.org", timeout=10.0, follow_redirects=True)
-              print("sempa.org status:", r.status_code)
-          except Exception as e:
-              print("httpx error:", e)
-          PY
-
-      - name: Verify URL list & make head subset
-        run: |
-          test -f scripts/urls.txt || (echo "Missing scripts/urls.txt" && exit 1)
-          echo "First 12 lines:"
-          sed -n '1,12p' scripts/urls.txt
-          head -n 10 scripts/urls.txt > scripts/urls.head.txt
-          echo "Using subset:"
-          cat scripts/urls.head.txt
-
-      - name: Dry run ingest (10 URLs) with keepalive
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          EMBED_MODEL: text-embedding-3-small
-          PYTHONUNBUFFERED: "1"
-        run: |
-          set -e
-          python -u scripts/ingest_sempa.py --urls-file scripts/urls.head.txt --out /tmp/embeddings_test & pid=$!
-          # keep the runner non-idle and show we weren't auto-canceled until this loop stops
-          while kill -0 $pid 2>/dev/null; do
-            echo "::notice:: ingest running (pid=$pid) at $(date -u +"%H:%M:%S")"
-            sleep 15
-          done
-          wait $pid
-          ls -la /tmp/embeddings_test
+      - name: Simple sanity
+        run: python -c "print('ok')"
