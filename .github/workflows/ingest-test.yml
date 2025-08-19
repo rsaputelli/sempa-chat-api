@@ -1,34 +1,44 @@
 ﻿name: Test SEMPA ingest (no commit)
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Unique group per run so nothing gets auto-canceled
+concurrency:
+  group: ingest-sempa-test-${{ github.run_id }}
+  cancel-in-progress: false
 
 jobs:
-  ingest_test:
+  test:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
-    concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}
-      cancel-in-progress: false
-
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          pip install --no-cache-dir -r requirements.txt
-          pip install --no-cache-dir beautifulsoup4 httpx
+          pip install -r requirements.txt
+          pip install beautifulsoup4 httpx
 
-      - name: Ingest SEMPA (no commit)
+      - name: Ingest (dry run)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           EMBED_MODEL: text-embedding-3-small
         run: |
-          python scripts/ingest_sempa.py \
-            --urls-file scripts/urls.txt \
-            --out clients/sempa/embeddings_v2
+          python scripts/ingest_sempa.py --urls-file scripts/urls.txt --out _tmp_out
+
+      - name: Show output summary
+        if: always()
+        run: |
+          echo "==== _tmp_out ===="
+          ls -lah _tmp_out || true
+          ls -lah _tmp_out/* || true
