@@ -1,29 +1,30 @@
 ﻿name: Rebuild SEMPA embeddings
 
 on:
-  workflow_dispatch:
   schedule:
-    - cron: "0 9 * * 1"  # Mondays 09:00 UTC
+    - cron: "0 6 * * 1"   # Mondays 06:00 UTC
+  workflow_dispatch: {}
 
-permissions:
-  contents: write
-
-# One live run at a time; new run cancels prior
 concurrency:
-  group: ingest-sempa-live
+  group: sempa-ingest-live
   cancel-in-progress: true
 
 jobs:
   ingest:
+    timeout-minutes: 120
     runs-on: ubuntu-latest
-    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Cache pip
+        uses: actions/cache@v4
         with:
-          python-version: "3.11"
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
       - name: Install deps
         run: |
@@ -31,16 +32,30 @@ jobs:
           pip install -r requirements.txt
           pip install beautifulsoup4 httpx
 
-      - name: Ingest (write to repo folder)
+      - name: Guard: missing OPENAI_API_KEY
+        if: ${{ env.OPENAI_API_KEY == '' }}
+        run: |
+          echo "::error::OPENAI_API_KEY repository secret is not set."
+          exit 1
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Ingest (live)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           EMBED_MODEL: text-embedding-3-small
         run: |
-          python scripts/ingest_sempa.py --urls-file scripts/urls.txt --out clients/sempa/embeddings_v2
+          set -e
+          echo "Start: $(date -Is)"
+          python scripts/ingest_sempa.py ^
+            --urls-file scripts/urls.txt ^
+            --out clients/sempa/embeddings_v2
+          echo "Done: $(date -Is)"
 
-      - name: Commit if changed
+      - name: Commit & push embeddings
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add clients/sempa/embeddings_v2 || true
-          git diff --cached --quiet && echo "No changes" || (git commit -m "chore: refresh embeddings_v2" && git push)
+          git add clients/sempa/embeddings_v2/*
+          git commit -m "embeddings_v2: weekly refresh ($(date -Is))" || echo "No changes to commit."
+          git push

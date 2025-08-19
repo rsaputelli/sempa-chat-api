@@ -1,27 +1,28 @@
 ﻿name: Test SEMPA ingest (no commit)
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: {}
 
-permissions:
-  contents: read
-
-# Unique group per run so nothing gets auto-canceled
 concurrency:
-  group: ingest-sempa-test-${{ github.run_id }}
+  group: sempa-ingest-test-${{ github.run_id }}
   cancel-in-progress: false
 
 jobs:
-  test:
+  ingest-test:
+    timeout-minutes: 120
     runs-on: ubuntu-latest
-    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Cache pip
+        uses: actions/cache@v4
         with:
-          python-version: "3.11"
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
       - name: Install deps
         run: |
@@ -29,16 +30,28 @@ jobs:
           pip install -r requirements.txt
           pip install beautifulsoup4 httpx
 
-      - name: Ingest (dry run)
+      - name: Guard: missing OPENAI_API_KEY
+        if: ${{ env.OPENAI_API_KEY == '' }}
+        run: |
+          echo "::error::OPENAI_API_KEY repository secret is not set."
+          exit 1
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Ingest (test only)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           EMBED_MODEL: text-embedding-3-small
         run: |
-          python scripts/ingest_sempa.py --urls-file scripts/urls.txt --out _tmp_out
+          set -e
+          echo "Start: $(date -Is)"
+          python scripts/ingest_sempa.py ^
+            --urls-file scripts/urls.txt ^
+            --out clients/sempa/embeddings_v2
+          echo "Done: $(date -Is)"
 
-      - name: Show output summary
-        if: always()
-        run: |
-          echo "==== _tmp_out ===="
-          ls -lah _tmp_out || true
-          ls -lah _tmp_out/* || true
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sempa-embeddings-v2
+          path: clients/sempa/embeddings_v2
