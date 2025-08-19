@@ -1,46 +1,42 @@
-﻿name: Test SEMPA ingest (no commit)
+﻿name: Ingest (test only, no commit)
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
 
 concurrency:
-  group: sempa-ingest-test-${{ github.run_id }}
+  group: ingest-test
   cancel-in-progress: false
 
 jobs:
-  ingest-test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    steps:
-      - uses: actions/checkout@v4
+  test:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
 
-      - uses: actions/setup-python@v5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
-
       - name: Install deps
         run: |
-          set -e
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install beautifulsoup4 httpx
+          pip install -r requirements.txt beautifulsoup4 httpx
 
-      - name: Ingest (test only, no commit)
+      - name: Verify URL list
+        run: |
+          test -f scripts/urls.txt || (echo "Missing scripts/urls.txt" && exit 1)
+          echo "First few URLs:" && sed -n '1,10p' scripts/urls.txt
+
+      - name: Dry run ingest (no commit)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           EMBED_MODEL: text-embedding-3-small
         run: |
-          set -e
-          python scripts/ingest_sempa.py --urls-file scripts/urls.txt --out clients/sempa/embeddings_v2
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: sempa-embeddings-v2
-          path: clients/sempa/embeddings_v2
+          python scripts/ingest_sempa.py --urls-file scripts/urls.txt --out /tmp/embeddings_test
+          ls -la /tmp/embeddings_test

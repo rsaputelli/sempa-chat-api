@@ -1,51 +1,55 @@
 ﻿name: Rebuild SEMPA embeddings
 
 on:
+  workflow_dispatch:
   schedule:
-    - cron: "0 6 * * 1"   # Mondays 06:00 UTC
-  workflow_dispatch: {}
+    # Every Monday at 06:00 UTC
+    - cron: "0 6 * * 1"
 
 concurrency:
-  group: sempa-ingest-live
+  group: ingest-weekly
   cancel-in-progress: true
+
+permissions:
+  contents: write
 
 jobs:
   ingest:
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    steps:
-      - uses: actions/checkout@v4
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
 
-      - uses: actions/setup-python@v5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
-
       - name: Install deps
         run: |
-          set -e
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install beautifulsoup4 httpx
+          pip install -r requirements.txt beautifulsoup4 httpx
 
-      - name: Ingest (live)
+      - name: Build embeddings
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           EMBED_MODEL: text-embedding-3-small
         run: |
-          set -e
           python scripts/ingest_sempa.py --urls-file scripts/urls.txt --out clients/sempa/embeddings_v2
+          ls -la clients/sempa/embeddings_v2
 
-      - name: Commit & push embeddings
+      - name: Commit artifacts (if changed)
         run: |
-          set -e
           git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add clients/sempa/embeddings_v2/* || true
-          git commit -m "embeddings_v2: refresh $(date -Is)" || echo "No changes."
-          git push || true
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add clients/sempa/embeddings_v2/*
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Update embeddings_v2 [skip ci]"
+            git push origin ${{ github.ref }}
+          fi
