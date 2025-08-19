@@ -1,9 +1,9 @@
-﻿name: Rebuild SEMPA embeddings
+name: Rebuild SEMPA embeddings
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 9 * * 1"  # Mondays 09:00 UTC (adjust as you like)
+    - cron: "0 9 * * 1"  # Mondays 09:00 UTC
 
 permissions:
   contents: write
@@ -12,18 +12,26 @@ jobs:
   ingest:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    # Allow multiple runs to coexist; do NOT cancel an in-progress run.
     concurrency:
       group: sempa-ingest-${{ github.ref }}
       cancel-in-progress: false
-
     env:
+      PYTHONUNBUFFERED: "1"
       EMBED_MODEL: text-embedding-3-small
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref_name }}
+
+      - name: Set git identity
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
@@ -33,36 +41,37 @@ jobs:
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install beautifulsoup4 httpx
+          pip install -r requirements.txt beautifulsoup4 httpx
 
       - name: Show URL preview (first 15)
         run: |
           test -f scripts/urls.txt || (echo "Missing scripts/urls.txt" && exit 1)
-          echo "Preview:"; head -n 15 scripts/urls.txt
+          head -n 15 scripts/urls.txt
 
       - name: Build embeddings (with heartbeat)
         shell: bash
         run: |
-          set -e
-          # emit a heartbeat every 20s so the runner never looks idle
-          ( while true; do echo "::notice::heartbeat $(date -u +"%H:%M:%S")"; sleep 20; done ) &
-          HB=$!
-          python scripts/ingest_sempa.py --urls-file scripts/urls.txt --out clients/sempa/embeddings_v2 --batch 64 --max-urls 200 --max-chunks 6000 --batch 64 --max-urls 200 --max-chunks 6000
+          set -euo pipefail
+          ( while true; do echo "::notice::heartbeat $(date -u +%H:%M:%S)"; sleep 20; done ) & HB=$!
+          python scripts/ingest_sempa.py \
+            --urls-file scripts/urls.txt \
+            --out clients/sempa/embeddings_v2 \
+            --batch 64 \
+            --max-urls 200 \
+            --max-chunks 6000
           kill $HB || true
-          ls -la clients/sempa/embeddings_v2
+          ls -la clients/sempa/embeddings_v2 || true
 
       - name: Commit & push embeddings
-        if: ${{ success() && github.event_name == 'workflow_dispatch' }}
+        if: ${{ success() }}
         run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add clients/sempa/embeddings_v2/*
+          git add -A clients/sempa/embeddings_v2
           if git diff --cached --quiet; then
             echo "No changes to commit."
           else
             git commit -m "chore(ingest): refresh embeddings_v2 [skip ci]"
-            git push
+            git push origin HEAD:${{ github.ref_name }}
           fi
+
 
 
