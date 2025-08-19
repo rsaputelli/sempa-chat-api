@@ -3,25 +3,18 @@
 on:
   workflow_dispatch:
 
-concurrency:
-  group: ingest-test
-  cancel-in-progress: false
-
+# No shared concurrency (avoid auto-cancel)
 jobs:
   test:
     runs-on: ubuntu-22.04
     timeout-minutes: 60
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 1 }
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
 
       - name: Install deps
         run: |
@@ -33,10 +26,19 @@ jobs:
           test -f scripts/urls.txt || (echo "Missing scripts/urls.txt" && exit 1)
           echo "First few URLs:" && sed -n '1,10p' scripts/urls.txt
 
-      - name: Dry run ingest (no commit)
+      - name: Dry run ingest (no commit) with keepalive
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           EMBED_MODEL: text-embedding-3-small
+          PYTHONUNBUFFERED: "1"
         run: |
-          python scripts/ingest_sempa.py --urls-file scripts/urls.txt --out /tmp/embeddings_test
+          set -e
+          # start ingest (unbuffered)
+          python -u scripts/ingest_sempa.py --urls-file scripts/urls.txt --out /tmp/embeddings_test & pid=$!
+          # keep logs alive every 20s so runner won't cancel for idleness
+          while kill -0 $pid 2>/dev/null; do
+            echo "::notice:: ingest running (pid=$pid) ..."
+            sleep 20
+          done
+          wait $pid
           ls -la /tmp/embeddings_test
